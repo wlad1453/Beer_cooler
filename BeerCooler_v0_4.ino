@@ -23,7 +23,7 @@
 #define COOL2_PIN 6
 #define COOL3_PIN 7
 
-#define INTERVAL 15000
+#define INTERVAL 900000
 
 OneWire oneWire(SENS_PIN);
 DallasTemperature sensors(&oneWire);
