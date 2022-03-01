@@ -13,15 +13,17 @@
  * ROM = 28 FE 1D 34 15 20 6 CA
  */
 
-
-
 #include <Wire.h> 
 #include <OneWire.h> 
- // #include <LiquidCrystal_I2C.h>
 #include <LiquidCrystal_PCF8574.h>
 #include "DallasTemperature.h"
 
 #define SENS_PIN 3
+#define COOL1_PIN 5
+#define COOL2_PIN 6
+#define COOL3_PIN 7
+
+#define INTERVAL 15000
 
 OneWire oneWire(SENS_PIN);
 DallasTemperature sensors(&oneWire);
@@ -31,27 +33,14 @@ DeviceAddress sensor3 = { 0x28, 0xFE, 0x1D, 0x34, 0x15, 0x20, 0x6, 0xCA };   // 
 
 LiquidCrystal_PCF8574 lcd(0x3f);        // Set the LCD I2C address
 
-// Creat a set of new characters
-
-const uint8_t charBitmap[][8] = {
-   { 0xc, 0x12, 0x12, 0xc, 0, 0, 0, 0 },
-   { 0x6, 0x9, 0x9, 0x6, 0, 0, 0, 0 },
-   { 0x0, 0x6, 0x9, 0x9, 0x6, 0, 0, 0x0 },
-   { 0x0, 0xc, 0x12, 0x12, 0xc, 0, 0, 0x0 },
-   { 0x0, 0x0, 0xc, 0x12, 0x12, 0xc, 0, 0x0 },
-   { 0x0, 0x0, 0x6, 0x9, 0x9, 0x6, 0, 0x0 },
-   { 0x0, 0x0, 0x0, 0x6, 0x9, 0x9, 0x6, 0x0 },
-   { 0x0, 0x0, 0x0, 0xc, 0x12, 0x12, 0xc, 0x0 }
-   
-};
-
 float temp1 = 99.0, temp2 =99.0, temp3 = 90.0;
 
-bool pumpOn(0), fanOn(0), oneThirdCooler(0), twoThirdCooler(0);
+bool cooler1(0), cooler2(0), cooler3(0);
+bool C1_ToBeChanged(0), C2_ToBeChanged(0), C3_ToBeChanged(0);
+unsigned long C1_changeTime(0), C2_changeTime(0), C3_changeTime(0);
 
 void greeting(const LiquidCrystal_PCF8574 &scr);
 void screensaver(const LiquidCrystal_PCF8574 &scr);
-
 
 void setup()
 {
@@ -63,33 +52,71 @@ void setup()
   lcd.begin(16, 2);               // initialize the lcd
   lcd.setBacklight(1);  
   
-   int charBitmapSize = (sizeof(charBitmap ) / sizeof (charBitmap[0]));
-   for ( int i = 0; i < charBitmapSize; i++ )
-   {
-      lcd.createChar ( i, (uint8_t *)charBitmap[i] );
-   }  
+  Serial.println("Temp1  Temp2  Temp3");
 
-   Serial.println("Temp1  Temp2  Temp3");
+  pinMode( COOL1_PIN, OUTPUT);
+  pinMode( COOL2_PIN, OUTPUT);
+  pinMode( COOL3_PIN, OUTPUT);  
+
+  digitalWrite( COOL1_PIN, HIGH);
+  digitalWrite( COOL2_PIN, HIGH);
+  digitalWrite( COOL3_PIN, HIGH);  
+
+  C1_changeTime = C2_changeTime = C3_changeTime = millis();
+  
     
-   greeting(lcd);
-   delay(10000);
+  greeting(lcd);
+  delay(10000);
    
 }
 
 
 void loop()
 {
-  // unsigned long tm = millis();
-  
   sensors.requestTemperatures(); // Send the command to get temperatures
-
-  // Serial.println(millis() - tm);
   
   temp1 = sensors.getTempC(sensor1);    // Temp after heat exchange 
   temp2 = sensors.getTempC(sensor2);    // Temp at output of the cistern (before cooler)
   temp3 = sensors.getTempC(sensor3);    // Temp on the air radiator (alarm condition)
 
   // Serial.println(millis() - tm);
+
+  if ( cooler1 && temp1 < 5 ) {                     // The outer elements should be switched off
+    if ( millis() - C1_changeTime > INTERVAL ){
+      digitalWrite( COOL1_PIN, LOW);
+      digitalWrite( COOL3_PIN, LOW);
+      cooler1 = false;
+      cooler3 = false;
+      C1_changeTime = millis();
+      C3_changeTime = millis();
+    }
+  }
+
+  if ( !cooler1 && temp1 >= 5 ) {                     // The outer elements should be switched off
+    if ( millis() - C1_changeTime > INTERVAL ){
+      digitalWrite( COOL1_PIN, HIGH);
+      digitalWrite( COOL3_PIN, HIGH);
+      cooler1 = true;
+      cooler3 = true;
+      C1_changeTime = millis();
+      C3_changeTime = millis();
+    }
+  }
+  
+  if ( cooler2 && temp1 < 3 ) {                   // The middle element should be switched off
+    if ( millis() - C2_changeTime > INTERVAL ){
+        digitalWrite( COOL2_PIN, LOW);
+        cooler2 = false;
+        C2_changeTime = millis();
+      }
+  } else if ( !cooler2 && temp1 >= 3 ) {
+    if ( millis() - C2_changeTime > INTERVAL ){
+        digitalWrite( COOL2_PIN, HIGH);
+        cooler2 = true;
+        C2_changeTime = millis();
+      }
+  }
+  
   
   Serial.print(temp1); 
   Serial.print(",");
@@ -101,26 +128,11 @@ void loop()
   
    // greeting(lcd);
 
-   // screensaver(lcd);
-
    // for ( uint8_t i = 0; i < 3; i++) alarm(lcd);
       
    delay(200);
 
    lcd_data(lcd, temp1, temp2, temp3);
-
-   /*
-
-   lcd.clear();
-   lcd.setCursor (0, 0);
-   lcd.print("Beer  Water  Fan");
-   lcd.setCursor (0, 1);
-   lcd.print (temp1, 2);  lcd.print (" ");   
-   lcd.print (temp2, 2);  lcd.print ("  ");   
-   lcd.print ("54.");
-
-   delay(1000);
-   */
 }
 
 void greeting(const LiquidCrystal_PCF8574 &scr)
