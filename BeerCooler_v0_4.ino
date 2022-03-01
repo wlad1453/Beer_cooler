@@ -34,6 +34,7 @@ DeviceAddress sensor3 = { 0x28, 0xFE, 0x1D, 0x34, 0x15, 0x20, 0x6, 0xCA };   // 
 LiquidCrystal_PCF8574 lcd(0x3f);        // Set the LCD I2C address
 
 float temp1 = 99.0, temp2 =99.0, temp3 = 90.0;
+float testTemp(10);
 
 bool cooler1(0), cooler2(0), cooler3(0);
 bool C1_ToBeChanged(0), C2_ToBeChanged(0), C3_ToBeChanged(0);
@@ -79,7 +80,8 @@ void loop()
   temp2 = sensors.getTempC(sensor2);    // Temp at output of the cistern (before cooler)
   temp3 = sensors.getTempC(sensor3);    // Temp on the air radiator (alarm condition)
 
-  // Serial.println(millis() - tm);
+
+  // readData(); temp1 = testTemp;
 
   if ( cooler1 && temp1 < 5 ) {                     // The outer elements should be switched off
     if ( millis() - C1_changeTime > INTERVAL ){
@@ -113,9 +115,12 @@ void loop()
     if ( millis() - C2_changeTime > INTERVAL ){
         digitalWrite( COOL2_PIN, HIGH);
         cooler2 = true;
+
+        Serial.println (millis() - C2_changeTime);
         C2_changeTime = millis();
       }
   }
+  
   
   
   Serial.print(temp1); 
@@ -164,26 +169,12 @@ void alarm(const LiquidCrystal_PCF8574 &scr)
   scr.setBacklight(1);
 }
 
-void screensaver(const LiquidCrystal_PCF8574 &scr)
-{  
-   scr.clear();
-   for ( int i = 0; i < 2; i++ )
-   {
-      for ( int j = 0; j < 16; j++ )
-      {        
-        
-        if( i == 0 ) {
-          scr.setCursor ( j, i);
-          if ( j < 8 )    scr.print (char(7 - j));
-          else            scr.print (char(j - 8));
-        } else {
-          scr.setCursor ( (15 - j), i);
-          if ( j < 8 )    scr.print (char(j));
-          else            scr.print (char(15 - j));          
-          }
-          delay(25);
-      }      
-  }
+void readData() {
+
+    String Inp = "";
+  
+    Inp = Serial.readString();
+    if ( Inp.length() > 0 && Inp.toFloat() ) testTemp = Inp.toFloat(); // If there is an input AND this input contains meaningful number
 }
 
 void lcd_data(const LiquidCrystal_PCF8574 &scr, float t1, float t2, float t3)
